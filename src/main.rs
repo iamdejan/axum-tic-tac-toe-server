@@ -1,10 +1,16 @@
 use std::{net::SocketAddr, path::PathBuf};
 
 use axum::{
-    extract::{ws, State, WebSocketUpgrade}, http::{StatusCode, Version}, response::IntoResponse, routing::{any, get}, Router
+    Router,
+    extract::{
+        WebSocketUpgrade,
+        ws::{WebSocket},
+    },
+    http::{StatusCode, Version},
+    response::IntoResponse,
+    routing::{any, get},
 };
 use axum_server::tls_rustls::RustlsConfig;
-use tokio::sync::broadcast;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
@@ -18,7 +24,6 @@ async fn main() {
         .init();
 
     let certs_folder_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("self_signed_certs");
-    // let cert_file_path = certs_folder_path.join("cert.pem");
     let cert_file_path = certs_folder_path.join("fullchain.crt");
     let key_file_path = certs_folder_path.join("key.pem");
     let config = RustlsConfig::from_pem_file(cert_file_path, key_file_path)
@@ -27,8 +32,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(index))
-        .route("/ws", any(ws_handler))
-        .with_state(broadcast::channel::<String>(20).0);
+        .route("/ws", any(ws_handler));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
     tracing::debug!("listening on {}", addr);
@@ -44,36 +48,24 @@ async fn index() -> axum::response::Response {
     return (StatusCode::OK, "Hello world").into_response();
 }
 
-async fn ws_handler(
-    ws: WebSocketUpgrade,
-    version: Version,
-    State(sender): State<broadcast::Sender<String>>,
-) -> axum::response::Response {
+async fn ws_handler(ws: WebSocketUpgrade, version: Version) -> axum::response::Response {
     tracing::debug!("Accepted a WebSocket using {version:?}");
+    return ws.on_upgrade(handle_socket);
+}
 
-    let mut receiver = sender.subscribe();
-    return ws.on_upgrade(|mut ws | async move {
-        loop {
-            tokio::select! {
-                res = ws.recv() => {
-                    match res {
-                        Some(Ok(ws::Message::Text(s))) => {
-                            let _ = sender.send(s.to_string());
-                        },
-                        Some(Ok(_)) => {},
-                        Some(Err(e)) => tracing::debug!("Client disconnected abruptly: {e}"),
-                        None => break,
-                    }
-                }
-                res = receiver.recv() => {
-                    match res {
-                        Ok(msg) => if let Err(e) = ws.send(ws::Message::Text(msg.into())).await {
-                            tracing::debug!("Client disconnected abruptly: {e}");
-                        },
-                        Err(_) => continue,
-                    }
-                }
+async fn handle_socket(mut socket: WebSocket) {
+    while let Some(msg) = socket.recv().await {
+        let text = match msg {
+            Ok(text) => text,
+            Err(e) => {
+                tracing::debug!("Client abruptly disconnected: {e}");
+                return;
             }
+        };
+
+        let send_result = socket.send(text).await;
+        if let Err(e) = send_result {
+            tracing::debug!("Client abruptly disconnected: {e}")
         }
-    });
+    }
 }
