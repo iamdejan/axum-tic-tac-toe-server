@@ -24,7 +24,7 @@ async fn main() {
         .init();
 
     let certs_folder_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("self_signed_certs");
-    let cert_file_path = certs_folder_path.join("fullchain.crt");
+    let cert_file_path = certs_folder_path.join("cert.pem");
     let key_file_path = certs_folder_path.join("key.pem");
     let config = RustlsConfig::from_pem_file(cert_file_path, key_file_path)
         .await
