@@ -8,9 +8,9 @@ use serde::{Deserialize, Serialize};
 pub struct Room {
     pub x: Option<String>,
     pub o: Option<String>,
-    pub board: [[char; 3]; 3],
-    pub current_turn: Option<String>,
-    pub winner: Option<String>,
+    pub _board: [[Option<char>; 3]; 3],
+    pub _current_turn: Option<String>,
+    pub _winner: Option<String>,
 }
 
 impl Room {
@@ -18,20 +18,20 @@ impl Room {
         return Room {
             x: Option::None,
             o: Option::None,
-            board: [[' '; 3]; 3],
-            current_turn: Option::None,
-            winner: Option::None,
+            _board: [[Option::None; 3]; 3],
+            _current_turn: Option::None,
+            _winner: Option::None,
         };
     }
 
-    pub fn put(&mut self, user_id: String) -> Result<String, String> {
+    pub fn put(&mut self, user_id: String) -> Result<char, String> {
         if self.x.is_none() {
             self.x = Option::Some(user_id);
-            return Ok(String::from("x"));
+            return Ok('x');
         }
         if self.o.is_none() {
             self.o = Option::Some(user_id);
-            return Ok(String::from("o"));
+            return Ok('o');
         }
         
         return Err(String::from("Room is already full"));

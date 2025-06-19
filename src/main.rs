@@ -98,19 +98,24 @@ async fn handle_socket(mut socket: WebSocket, state: AppState) {
                 let room_id = command.params.unwrap().get("room_id").unwrap().to_owned();
                 let user_id = uuid::Uuid::now_v7().to_string();
 
-                let mut result = String::new();
-                match state.rooms.lock() {
+                let character_result = match state.rooms.lock() {
                     Ok(mut rooms) => {
-                        let room_option = rooms.get_mut(&room_id);
-                        if let Some(room) = room_option {
-                            result = room.put(user_id.clone()).unwrap();
+                        match rooms.get_mut(&room_id) {
+                            Some(room) => room.put(user_id.clone()),
+                            None => Err(String::from("Room not found")),
                         }
                     },
-                    _ => {},
+                    _ => Err(String::from("Fail to lock room")),
                 };
-
-                let response_message = format!("{{\"user_id\": \"{}\", \"character\": \"{}\"}}", user_id, result);
-                let send_result = socket.send(Message::from(response_message.clone())).await;
+                let send_result = match character_result {
+                    Ok(character) => {
+                        let response_message = format!("{{\"user_id\": \"{}\", \"character\": \"{}\"}}", user_id, character);
+                        socket.send(Message::from(response_message.clone())).await
+                    },
+                    Err(e) => {
+                        socket.send(Message::from(format!("{{\"error\": \"{}\"}}", e))).await
+                    }
+                };
                 if let Err(e) = send_result {
                     tracing::debug!("Client abruptly disconnected: {e}")
                 }
