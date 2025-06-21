@@ -121,10 +121,10 @@ fn create_room(state: &AppState) {
         _ => {}
     };
 
-    let response_message = json!({
+    let message = json!({
         "room_id": room_id
     });
-    let send_result = state.sender.send(response_message.to_string());
+    let send_result = state.sender.send(message.to_string());
     if let Err(e) = send_result {
         tracing::debug!("Client abruptly disconnected: {e}");
         return;
@@ -147,27 +147,28 @@ fn join_room(state: &AppState, params: HashMap<String, String>) {
 
     let character_result = match state.rooms.lock() {
         Ok(mut rooms) => match rooms.get_mut(&room_id) {
-            Some(room) => room.put(user_id.clone()),
+            Some(room) => room.join(user_id.clone()),
             None => Err(String::from("Room not found")),
         },
-        _ => Err(String::from("Fail to lock room")),
+        Err(e) => Err(format!("Fail to lock room: {}", e).to_string()),
     };
     let send_result = match character_result {
         Ok(character) => {
-            let response_message = json!({
+            let message = json!({
                 "room_id": &room_id,
                 "user_id": user_id,
+                "event": "GAME_JOINED",
                 "character": character,
             });
-            state.sender.send(response_message.to_string())
+            state.sender.send(message.to_string())
         }
         Err(e) => {
-            let response_message = json!({
+            let message = json!({
                 "room_id": &room_id,
                 "user_id": user_id,
                 "error": e,
             });
-            state.sender.send(response_message.to_string())
+            state.sender.send(message.to_string())
         }
     };
     if let Err(e) = send_result {
@@ -178,7 +179,7 @@ fn join_room(state: &AppState, params: HashMap<String, String>) {
     if is_room_full(&state, &room_id) {
         let message = json!({
             "room_id": &room_id,
-            "status": "GAME_STARTED"
+            "event": "GAME_STARTED"
         });
         state.sender.send(message.to_string()).unwrap();
     }
@@ -196,12 +197,40 @@ fn leave_room(state: &AppState, params: HashMap<String, String>) {
             "user_id": &user_id
         });
         state.sender.send(message.to_string()).unwrap();
+        return;
+    }
+
+    let leave_result = match state.rooms.lock() {
+        Ok(mut rooms) => match rooms.get_mut(&room_id) {
+            Some(room) => room.leave(user_id.clone()),
+            None => Err(String::from("Room not found")),
+        },
+        Err(e) => Err(format!("Fail to lock room: {}", e).to_string()),
+    };
+    match leave_result {
+        Ok(prev_char) => {
+            let message = json!({
+                "room_id": &room_id,
+                "user_id": &user_id,
+                "event": "LEAVE",
+                "character": prev_char,
+            });
+            state.sender.send(message.to_string()).unwrap();
+        },
+        Err(e) => {
+            let message = json!({
+                "room_id": &room_id,
+                "user_id": user_id,
+                "error": e,
+            });
+            state.sender.send(message.to_string()).unwrap();
+        }
     }
 }
 
 fn is_room_full(state: &AppState, room_id: &String) -> bool {
     let result = get_room_and_execute(state, room_id, |room| {
-        if room.is_full() && !room.is_game_started() {
+        if room.is_full() && !room.is_game_started() && !room.is_game_ended() {
             room.start_game();
         }
 
@@ -225,12 +254,12 @@ fn get_room_and_execute<T>(
     state: &AppState,
     room_id: &String,
     f: fn(&mut Room) -> T,
-) -> Result<T, ()> {
+) -> Result<T, String> {
     return match state.rooms.lock() {
         Ok(mut rooms) => match rooms.get_mut(room_id) {
             Some(room) => Ok(f(room)),
-            None => Err(()),
+            None => Err(String::from("Room not found")),
         },
-        Err(_) => Err(()),
+        Err(e) => Err(format!("Fail to lock room: {}", e).to_string()),
     };
 }
