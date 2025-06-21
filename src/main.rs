@@ -11,6 +11,7 @@ use axum::{
     routing::{any, get},
 };
 use axum_server::tls_rustls::RustlsConfig;
+use serde_json::json;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod game;
@@ -84,14 +85,18 @@ async fn handle_socket(mut socket: WebSocket, state: AppState) {
                 match state.rooms.lock() {
                     Ok(mut rooms) => {
                         rooms.insert(room_id.clone(), Room::new());
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 };
 
-                let response_message = format!("{{\"room_id\": \"{}\"}}", room_id);
-                let send_result = socket.send(Message::from(response_message)).await;
+                let response_message = json!({
+                    "room_id": room_id
+                });
+                let send_result = socket
+                    .send(Message::from(response_message.to_string()))
+                    .await;
                 if let Err(e) = send_result {
-                    tracing::debug!("Client abruptly disconnected: {e}")
+                    tracing::debug!("Client abruptly disconnected: {e}");
                 }
             }
             CommandType::Join => {
@@ -99,27 +104,52 @@ async fn handle_socket(mut socket: WebSocket, state: AppState) {
                 let user_id = uuid::Uuid::now_v7().to_string();
 
                 let character_result = match state.rooms.lock() {
-                    Ok(mut rooms) => {
-                        match rooms.get_mut(&room_id) {
-                            Some(room) => room.put(user_id.clone()),
-                            None => Err(String::from("Room not found")),
-                        }
+                    Ok(mut rooms) => match rooms.get_mut(&room_id) {
+                        Some(room) => room.put(user_id.clone()),
+                        None => Err(String::from("Room not found")),
                     },
                     _ => Err(String::from("Fail to lock room")),
                 };
                 let send_result = match character_result {
                     Ok(character) => {
-                        let response_message = format!("{{\"user_id\": \"{}\", \"character\": \"{}\"}}", user_id, character);
-                        socket.send(Message::from(response_message.clone())).await
-                    },
+                        let response_message = json!({
+                            "room_id": &room_id,
+                            "user_id": user_id,
+                            "character": character,
+                        });
+                        socket
+                            .send(Message::from(response_message.to_string()))
+                            .await
+                    }
                     Err(e) => {
-                        socket.send(Message::from(format!("{{\"error\": \"{}\"}}", e))).await
+                        let response_message = json!({
+                            "error": e,
+                        });
+                        socket
+                            .send(Message::from(response_message.to_string()))
+                            .await
                     }
                 };
                 if let Err(e) = send_result {
-                    tracing::debug!("Client abruptly disconnected: {e}")
+                    tracing::debug!("Client abruptly disconnected: {e}");
                 }
-            },
+
+                let room_is_full = match state.rooms.lock() {
+                    Ok(rooms) => match rooms.get(&room_id) {
+                        Some(room) => room.is_full(),
+                        None => false,
+                    },
+                    Err(_) => false,
+                };
+
+                if room_is_full {
+                    let message = json!({
+                        "room_id": &room_id,
+                        "status": "GAME_STARTED"
+                    });
+                    socket.send(Message::from(message.to_string())).await.unwrap();
+                }
+            }
             CommandType::Leave => todo!(),
         }
     }
