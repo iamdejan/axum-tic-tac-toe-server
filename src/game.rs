@@ -6,34 +6,72 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 pub struct Room {
-    _x: Option<String>,
-    _o: Option<String>,
+    x: Option<String>,
+    o: Option<String>,
     _board: [[Option<char>; 3]; 3],
-    _current_turn: Option<char>,
+    current_turn: Option<char>,
     _winner: Option<String>,
 }
 
 impl Room {
     pub fn new() -> Room {
         return Room {
-            _x: Option::None,
-            _o: Option::None,
-            _board: [[Option::None; 3]; 3],
-            _current_turn: Option::None,
-            _winner: Option::None,
+            x: None,
+            o: None,
+            _board: [[None; 3]; 3],
+            current_turn: None,
+            _winner: None,
         };
+    }
+
+    pub fn put(&mut self, user_id: String) -> Result<char, String> {
+        match self.x.clone() {
+            None => {
+                self.x = Some(user_id);
+                return Ok('x');
+            }
+            Some(assigned_user_id) => {
+                if assigned_user_id == user_id {
+                    return Ok('x');
+                }
+            }
+        }
+
+        match self.o.clone() {
+            None => {
+                self.o = Some(user_id);
+                return Ok('o');
+            }
+            Some(assigned_user_id) => {
+                if assigned_user_id == user_id {
+                    return Ok('o');
+                }
+            }
+        }
+
+        return Err(String::from("Room is already full"));
+    }
+
+    pub fn is_full(&self) -> bool {
+        return self.x.is_some() && self.o.is_some();
+    }
+
+    pub fn start_game(&mut self) {
+        self.current_turn = Option::Some('x');
     }
 }
 
 #[derive(Clone)]
 pub struct AppState {
     pub rooms: Arc<Mutex<HashMap<String, Room>>>,
+    pub sender: tokio::sync::broadcast::Sender<String>,
 }
 
 impl AppState {
     pub fn new() -> AppState {
         return AppState {
             rooms: Arc::new(Mutex::new(HashMap::new())),
+            sender: tokio::sync::broadcast::channel(100).0,
         };
     }
 }
