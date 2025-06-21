@@ -145,13 +145,7 @@ fn join_room(state: &AppState, params: HashMap<String, String>) {
         return;
     }
 
-    let character_result = match state.rooms.lock() {
-        Ok(mut rooms) => match rooms.get_mut(&room_id) {
-            Some(room) => room.join(user_id.clone()),
-            None => Err(String::from("Room not found")),
-        },
-        Err(e) => Err(format!("Fail to lock room: {}", e).to_string()),
-    };
+    let character_result = get_room_and_execute(state, &room_id, |room| room.join(user_id.clone()));
     let send_result = match character_result {
         Ok(character) => {
             let message = json!({
@@ -200,14 +194,8 @@ fn leave_room(state: &AppState, params: HashMap<String, String>) {
         return;
     }
 
-    let leave_result = match state.rooms.lock() {
-        Ok(mut rooms) => match rooms.get_mut(&room_id) {
-            Some(room) => room.leave(user_id.clone()),
-            None => Err(String::from("Room not found")),
-        },
-        Err(e) => Err(format!("Fail to lock room: {}", e).to_string()),
-    };
-    match leave_result {
+    let leave_result = get_room_and_execute(state, &room_id, |room| room.leave(user_id.clone()));
+    let send_result = match leave_result {
         Ok(prev_char) => {
             let message = json!({
                 "room_id": &room_id,
@@ -215,7 +203,7 @@ fn leave_room(state: &AppState, params: HashMap<String, String>) {
                 "event": "LEAVE",
                 "character": prev_char,
             });
-            state.sender.send(message.to_string()).unwrap();
+            state.sender.send(message.to_string())
         }
         Err(e) => {
             let message = json!({
@@ -223,8 +211,11 @@ fn leave_room(state: &AppState, params: HashMap<String, String>) {
                 "user_id": user_id,
                 "error": e,
             });
-            state.sender.send(message.to_string()).unwrap();
+            state.sender.send(message.to_string())
         }
+    };
+    if let Err(e) = send_result {
+        tracing::debug!("Client abruptly disconnected: {e}");
     }
 }
 
@@ -250,11 +241,13 @@ fn is_game_started(state: &AppState, room_id: &String) -> bool {
     };
 }
 
-fn get_room_and_execute<T>(
-    state: &AppState,
-    room_id: &String,
-    f: fn(&mut Room) -> T,
-) -> Result<T, String> {
+// references:
+// - https://www.reddit.com/r/learnrust/comments/xvxpy2/is_there_a_workaround_for_variable_capturing_in/
+// - https://doc.rust-lang.org/book/ch13-01-closures.html
+fn get_room_and_execute<T, F>(state: &AppState, room_id: &String, f: F) -> Result<T, String>
+where
+    F: Fn(&mut Room) -> T,
+{
     return match state.rooms.lock() {
         Ok(mut rooms) => match rooms.get_mut(room_id) {
             Some(room) => Ok(f(room)),
