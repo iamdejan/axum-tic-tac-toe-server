@@ -16,22 +16,37 @@ pub struct Room {
 impl Room {
     pub fn new() -> Room {
         return Room {
-            x: Option::None,
-            o: Option::None,
-            _board: [[Option::None; 3]; 3],
-            current_turn: Option::None,
-            _winner: Option::None,
+            x: None,
+            o: None,
+            _board: [[None; 3]; 3],
+            current_turn: None,
+            _winner: None,
         };
     }
 
     pub fn put(&mut self, user_id: String) -> Result<char, String> {
-        if self.x.is_none() {
-            self.x = Option::Some(user_id);
-            return Ok('x');
+        match self.x.clone() {
+            None => {
+                self.x = Some(user_id);
+                return Ok('x');
+            },
+            Some(assigned_user_id) => {
+                if assigned_user_id == user_id {
+                    return Ok('x');
+                }
+            },
         }
-        if self.o.is_none() {
-            self.o = Option::Some(user_id);
-            return Ok('o');
+
+        match self.o.clone() {
+            None => {
+                self.o = Some(user_id);
+                return Ok('o');
+            },
+            Some(assigned_user_id) => {
+                if assigned_user_id == user_id {
+                    return Ok('o');
+                }
+            },
         }
 
         return Err(String::from("Room is already full"));
