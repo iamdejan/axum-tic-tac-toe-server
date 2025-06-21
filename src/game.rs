@@ -23,7 +23,6 @@ impl Room {
             _winner: Option::None,
         };
     }
-
 }
 
 #[derive(Clone)]
