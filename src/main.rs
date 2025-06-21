@@ -225,7 +225,7 @@ fn is_room_full(state: &AppState, room_id: &String) -> bool {
             room.start_game();
         }
 
-        return room.is_full();
+        return Ok(room.is_full());
     });
     return match result {
         Ok(b) => b,
@@ -234,7 +234,7 @@ fn is_room_full(state: &AppState, room_id: &String) -> bool {
 }
 
 fn is_game_started(state: &AppState, room_id: &String) -> bool {
-    let result = get_room_and_execute(state, room_id, |room| room.is_game_started());
+    let result = get_room_and_execute(state, room_id, |room| Ok(room.is_game_started()));
     return match result {
         Ok(b) => b,
         Err(_) => false,
@@ -246,11 +246,11 @@ fn is_game_started(state: &AppState, room_id: &String) -> bool {
 // - https://doc.rust-lang.org/book/ch13-01-closures.html
 fn get_room_and_execute<T, F>(state: &AppState, room_id: &String, f: F) -> Result<T, String>
 where
-    F: Fn(&mut Room) -> T,
+    F: FnOnce(&mut Room) -> Result<T, String>,
 {
     return match state.rooms.lock() {
         Ok(mut rooms) => match rooms.get_mut(room_id) {
-            Some(room) => Ok(f(room)),
+            Some(room) => f(room),
             None => Err(String::from("Room not found")),
         },
         Err(e) => Err(format!("Fail to lock room: {}", e).to_string()),
