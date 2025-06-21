@@ -124,30 +124,19 @@ async fn handle_socket_recv(state: AppState, message_result: Result<Message, axu
             }
         }
         CommandType::Join => {
-            let room_id = command.params.unwrap().get("room_id").unwrap().to_owned();
-            let room_is_full = match state.rooms.lock() {
-                Ok(mut rooms) => match rooms.get_mut(&room_id) {
-                    Some(room) => {
-                        if room.is_full() {
-                            room.start_game();
-                        }
-
-                        room.is_full()
-                    }
-                    None => false,
-                },
-                Err(_) => false,
-            };
-            if room_is_full {
+            let params = command.params.unwrap();
+            let room_id = params.get("room_id").unwrap().to_string();
+            let user_id = params.get("user_id").unwrap().to_string();
+            let is_full = is_room_full(&state, &room_id);
+            if is_full {
                 let message = json!({
                     "room_id": &room_id,
+                    "user_id": user_id,
                     "error": "Room is already full"
                 });
                 state.sender.send(message.to_string()).unwrap(); // ignore error handling for now
                 return;
             }
-
-            let user_id = uuid::Uuid::now_v7().to_string();
 
             let character_result = match state.rooms.lock() {
                 Ok(mut rooms) => match rooms.get_mut(&room_id) {
@@ -167,6 +156,8 @@ async fn handle_socket_recv(state: AppState, message_result: Result<Message, axu
                 }
                 Err(e) => {
                     let response_message = json!({
+                        "room_id": &room_id,
+                        "user_id": user_id,
                         "error": e,
                     });
                     state.sender.send(response_message.to_string())
@@ -177,21 +168,7 @@ async fn handle_socket_recv(state: AppState, message_result: Result<Message, axu
                 return;
             }
 
-            let room_is_full = match state.rooms.lock() {
-                Ok(mut rooms) => match rooms.get_mut(&room_id) {
-                    Some(room) => {
-                        if room.is_full() {
-                            room.start_game();
-                        }
-
-                        room.is_full()
-                    }
-                    None => false,
-                },
-                Err(_) => false,
-            };
-
-            if room_is_full {
+            if is_room_full(&state, &room_id) {
                 let message = json!({
                     "room_id": &room_id,
                     "status": "GAME_STARTED"
@@ -201,4 +178,20 @@ async fn handle_socket_recv(state: AppState, message_result: Result<Message, axu
         }
         CommandType::Leave => todo!(),
     }
+}
+
+fn is_room_full(state: &AppState, room_id: &String) -> bool {
+    return match state.rooms.lock() {
+        Ok(mut rooms) => match rooms.get_mut(room_id) {
+            Some(room) => {
+                if room.is_full() {
+                    room.start_game();
+                }
+
+                room.is_full()
+            }
+            None => false,
+        },
+        Err(_) => false,
+    };
 }
