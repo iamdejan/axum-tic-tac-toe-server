@@ -99,57 +99,7 @@ async fn handle_socket(mut socket: WebSocket, state: AppState) {
                     tracing::debug!("Client abruptly disconnected: {e}");
                 }
             }
-            CommandType::Join => {
-                let room_id = command.params.unwrap().get("room_id").unwrap().to_owned();
-                let user_id = uuid::Uuid::now_v7().to_string();
-
-                let character_result = match state.rooms.lock() {
-                    Ok(mut rooms) => match rooms.get_mut(&room_id) {
-                        Some(room) => room.put(user_id.clone()),
-                        None => Err(String::from("Room not found")),
-                    },
-                    _ => Err(String::from("Fail to lock room")),
-                };
-                let send_result = match character_result {
-                    Ok(character) => {
-                        let response_message = json!({
-                            "room_id": &room_id,
-                            "user_id": user_id,
-                            "character": character,
-                        });
-                        socket
-                            .send(Message::from(response_message.to_string()))
-                            .await
-                    }
-                    Err(e) => {
-                        let response_message = json!({
-                            "error": e,
-                        });
-                        socket
-                            .send(Message::from(response_message.to_string()))
-                            .await
-                    }
-                };
-                if let Err(e) = send_result {
-                    tracing::debug!("Client abruptly disconnected: {e}");
-                }
-
-                let room_is_full = match state.rooms.lock() {
-                    Ok(rooms) => match rooms.get(&room_id) {
-                        Some(room) => room.is_full(),
-                        None => false,
-                    },
-                    Err(_) => false,
-                };
-
-                if room_is_full {
-                    let message = json!({
-                        "room_id": &room_id,
-                        "status": "GAME_STARTED"
-                    });
-                    socket.send(Message::from(message.to_string())).await.unwrap();
-                }
-            }
+            CommandType::Join => todo!(),
             CommandType::Leave => todo!(),
         }
     }
