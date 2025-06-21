@@ -108,7 +108,7 @@ fn handle_socket_recv(state: &AppState, message: Message) {
         CommandType::Leave => {
             let params = command.params.unwrap();
             leave_room(state, params);
-        },
+        }
     }
 }
 
@@ -200,29 +200,37 @@ fn leave_room(state: &AppState, params: HashMap<String, String>) {
 }
 
 fn is_room_full(state: &AppState, room_id: &String) -> bool {
-    return match state.rooms.lock() {
-        Ok(mut rooms) => match rooms.get_mut(room_id) {
-            Some(room) => {
-                if room.is_full() && !room.is_game_started() {
-                    room.start_game();
-                }
+    let result = get_room_and_execute(state, room_id, |room| {
+        if room.is_full() && !room.is_game_started() {
+            room.start_game();
+        }
 
-                room.is_full()
-            }
-            None => false,
-        },
+        return room.is_full();
+    });
+    return match result {
+        Ok(b) => b,
         Err(_) => false,
     };
 }
 
 fn is_game_started(state: &AppState, room_id: &String) -> bool {
+    let result = get_room_and_execute(state, room_id, |room| room.is_game_started());
+    return match result {
+        Ok(b) => b,
+        Err(_) => false,
+    };
+}
+
+fn get_room_and_execute<T>(
+    state: &AppState,
+    room_id: &String,
+    f: fn(&mut Room) -> T,
+) -> Result<T, ()> {
     return match state.rooms.lock() {
         Ok(mut rooms) => match rooms.get_mut(room_id) {
-            Some(room) => {
-                room.is_game_started()
-            }
-            None => false,
+            Some(room) => Ok(f(room)),
+            None => Err(()),
         },
-        Err(_) => false,
+        Err(_) => Err(()),
     };
 }
