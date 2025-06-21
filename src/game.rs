@@ -10,7 +10,7 @@ pub struct Room {
     o: Option<String>,
     _board: [[Option<char>; 3]; 3],
     current_turn: Option<char>,
-    _winner: Option<String>,
+    winner: Option<String>,
 }
 
 impl Room {
@@ -20,11 +20,11 @@ impl Room {
             o: None,
             _board: [[None; 3]; 3],
             current_turn: None,
-            _winner: None,
+            winner: None,
         };
     }
 
-    pub fn put(&mut self, user_id: String) -> Result<char, String> {
+    pub fn join(&mut self, user_id: String) -> Result<char, String> {
         match self.x.clone() {
             None => {
                 self.x = Some(user_id);
@@ -52,6 +52,34 @@ impl Room {
         return Err(String::from("Room is already full"));
     }
 
+    pub fn leave(&mut self, user_id: String) -> Result<char, String> {
+        let e = Err(String::from("User never joined this room"));
+
+        match self.x.clone() {
+            Some(assigned_user_id) => {
+                if assigned_user_id == user_id {
+                    self.x = None;
+                    return Ok('x');
+                }
+            }
+            _ => {}
+        }
+
+        match self.o.clone() {
+            Some(assigned_user_id) => {
+                if assigned_user_id == user_id {
+                    self.o = None;
+                    return Ok('o');
+                } else {
+                    return e;
+                }
+            }
+            None => {
+                return e;
+            }
+        }
+    }
+
     pub fn is_full(&self) -> bool {
         return self.x.is_some() && self.o.is_some();
     }
@@ -62,6 +90,10 @@ impl Room {
 
     pub fn is_game_started(&self) -> bool {
         return self.current_turn.is_some();
+    }
+
+    pub fn is_game_ended(&self) -> bool {
+        return self.winner.is_some();
     }
 }
 
@@ -91,7 +123,7 @@ pub enum CommandType {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct Command {
+pub struct WebSocketMessage {
     pub command: CommandType,
     pub params: Option<HashMap<String, String>>,
 }
