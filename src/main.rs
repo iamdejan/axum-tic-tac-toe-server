@@ -154,7 +154,7 @@ fn join_room(state: &AppState, params: HashMap<String, String>) {
             let message = json!({
                 "room_id": &room_id,
                 "user_id": user_id,
-                "event": "GAME_JOINED",
+                "event": "ROOM_JOINED",
                 "character": character,
             });
             state.sender.send(message.to_string())
@@ -203,7 +203,7 @@ fn leave_room(state: &AppState, params: HashMap<String, String>) {
             let message = json!({
                 "room_id": &room_id,
                 "user_id": &user_id,
-                "event": "LEAVE",
+                "event": "ROOM_LEFT",
                 "character": prev_char,
             });
             state.sender.send(message.to_string())
