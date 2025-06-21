@@ -2,10 +2,7 @@ use std::{net::SocketAddr, path::PathBuf};
 
 use axum::{
     Router,
-    extract::{
-        State, WebSocketUpgrade,
-        ws::Message,
-    },
+    extract::{State, WebSocketUpgrade, ws::Message},
     http::{StatusCode, Version},
     response::IntoResponse,
     routing::{any, get},
