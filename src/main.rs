@@ -4,7 +4,7 @@ use axum::{
     Router,
     extract::{
         State, WebSocketUpgrade,
-        ws::{Message, WebSocket},
+        ws::Message,
     },
     http::{StatusCode, Version},
     response::IntoResponse,
@@ -60,97 +60,148 @@ async fn ws_handler(
     State(state): State<AppState>,
 ) -> axum::response::Response {
     tracing::debug!("Accepted a WebSocket using {version:?}");
-    return ws.on_upgrade(|socket| handle_socket(socket, state));
+    let mut receiver = state.sender.subscribe();
+    return ws.on_upgrade(|mut socket| async move {
+        loop {
+            tokio::select! {
+                res = socket.recv() => {
+                    match res {
+                        Some(message_result) => {
+                            if let Err(e) = message_result {
+                                tracing::debug!("Client abruptly disconnected: {e}");
+                                break
+                            }
+
+                            handle_socket_recv(state.clone(), message_result).await;
+                        },
+                        _ => {},
+                    }
+                }
+                res = receiver.recv() => {
+                    match res {
+                        Ok(msg) => {
+                            if let Err(e) = socket.send(Message::from(msg)).await {
+                                tracing::debug!("Client abruptly disconnected: {e}");
+                            }
+                        },
+                        _ => continue
+                    }
+                }
+            }
+        }
+    });
 }
 
-async fn handle_socket(mut socket: WebSocket, state: AppState) {
-    while let Some(message_result) = socket.recv().await {
-        let message = match message_result {
-            Ok(msg) => msg,
-            Err(e) => {
-                tracing::debug!("Client abruptly disconnected: {e}");
-                return;
-            }
-        };
-
-        let command_result = serde_json::from_str(message.to_text().unwrap());
-        if let Err(e) = command_result {
+async fn handle_socket_recv(state: AppState, message_result: Result<Message, axum::Error>) {
+    let message = match message_result {
+        Ok(msg) => msg,
+        Err(e) => {
             tracing::debug!("Client abruptly disconnected: {e}");
             return;
         }
-        let command: Command = command_result.unwrap();
-        match command.command {
-            CommandType::Create => {
-                let room_id = uuid::Uuid::now_v7().to_string();
-                match state.rooms.lock() {
-                    Ok(mut rooms) => {
-                        rooms.insert(room_id.clone(), Room::new());
-                    }
-                    _ => {}
-                };
+    };
 
-                let response_message = json!({
-                    "room_id": room_id
-                });
-                let send_result = socket
-                    .send(Message::from(response_message.to_string()))
-                    .await;
-                if let Err(e) = send_result {
-                    tracing::debug!("Client abruptly disconnected: {e}");
+    let command_result = serde_json::from_str(message.to_text().unwrap());
+    if let Err(e) = command_result {
+        tracing::debug!("Client abruptly disconnected: {e}");
+        return;
+    }
+    let command: Command = command_result.unwrap();
+    match command.command {
+        CommandType::Create => {
+            let room_id = uuid::Uuid::now_v7().to_string();
+            match state.rooms.lock() {
+                Ok(mut rooms) => {
+                    rooms.insert(room_id.clone(), Room::new());
                 }
+                _ => {}
+            };
+
+            let response_message = json!({
+                "room_id": room_id
+            });
+            let send_result = state.sender.send(response_message.to_string());
+            if let Err(e) = send_result {
+                tracing::debug!("Client abruptly disconnected: {e}");
+                return;
             }
-            CommandType::Join => {
-                let room_id = command.params.unwrap().get("room_id").unwrap().to_owned();
-                let user_id = uuid::Uuid::now_v7().to_string();
-
-                let character_result = match state.rooms.lock() {
-                    Ok(mut rooms) => match rooms.get_mut(&room_id) {
-                        Some(room) => room.put(user_id.clone()),
-                        None => Err(String::from("Room not found")),
-                    },
-                    _ => Err(String::from("Fail to lock room")),
-                };
-                let send_result = match character_result {
-                    Ok(character) => {
-                        let response_message = json!({
-                            "room_id": &room_id,
-                            "user_id": user_id,
-                            "character": character,
-                        });
-                        socket
-                            .send(Message::from(response_message.to_string()))
-                            .await
-                    }
-                    Err(e) => {
-                        let response_message = json!({
-                            "error": e,
-                        });
-                        socket
-                            .send(Message::from(response_message.to_string()))
-                            .await
-                    }
-                };
-                if let Err(e) = send_result {
-                    tracing::debug!("Client abruptly disconnected: {e}");
-                }
-
-                let room_is_full = match state.rooms.lock() {
-                    Ok(rooms) => match rooms.get(&room_id) {
-                        Some(room) => room.is_full(),
-                        None => false,
-                    },
-                    Err(_) => false,
-                };
-
-                if room_is_full {
-                    let message = json!({
-                        "room_id": &room_id,
-                        "status": "GAME_STARTED"
-                    });
-                    socket.send(Message::from(message.to_string())).await.unwrap();
-                }
-            }
-            CommandType::Leave => todo!(),
         }
+        CommandType::Join => {
+            let room_id = command.params.unwrap().get("room_id").unwrap().to_owned();
+            let room_is_full = match state.rooms.lock() {
+                Ok(mut rooms) => match rooms.get_mut(&room_id) {
+                    Some(room) => {
+                        if room.is_full() {
+                            room.start_game();
+                        }
+
+                        room.is_full()
+                    }
+                    None => false,
+                },
+                Err(_) => false,
+            };
+            if room_is_full {
+                let message = json!({
+                    "room_id": &room_id,
+                    "error": "Room is already full"
+                });
+                state.sender.send(message.to_string()).unwrap(); // ignore error handling for now
+                return;
+            }
+
+            let user_id = uuid::Uuid::now_v7().to_string();
+
+            let character_result = match state.rooms.lock() {
+                Ok(mut rooms) => match rooms.get_mut(&room_id) {
+                    Some(room) => room.put(user_id.clone()),
+                    None => Err(String::from("Room not found")),
+                },
+                _ => Err(String::from("Fail to lock room")),
+            };
+            let send_result = match character_result {
+                Ok(character) => {
+                    let response_message = json!({
+                        "room_id": &room_id,
+                        "user_id": user_id,
+                        "character": character,
+                    });
+                    state.sender.send(response_message.to_string())
+                }
+                Err(e) => {
+                    let response_message = json!({
+                        "error": e,
+                    });
+                    state.sender.send(response_message.to_string())
+                }
+            };
+            if let Err(e) = send_result {
+                tracing::debug!("Client abruptly disconnected: {e}");
+                return;
+            }
+
+            let room_is_full = match state.rooms.lock() {
+                Ok(mut rooms) => match rooms.get_mut(&room_id) {
+                    Some(room) => {
+                        if room.is_full() {
+                            room.start_game();
+                        }
+
+                        room.is_full()
+                    }
+                    None => false,
+                },
+                Err(_) => false,
+            };
+
+            if room_is_full {
+                let message = json!({
+                    "room_id": &room_id,
+                    "status": "GAME_STARTED"
+                });
+                state.sender.send(message.to_string()).unwrap(); // ignore error handling for now
+            }
+        }
+        CommandType::Leave => todo!(),
     }
 }

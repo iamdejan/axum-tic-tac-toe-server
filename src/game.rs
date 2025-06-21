@@ -44,23 +44,19 @@ impl Room {
     pub fn start_game(&mut self) {
         self.current_turn = Option::Some('x');
     }
-
-    pub fn game_is_started(&self) -> bool {
-        return self.current_turn.is_some();
-    }
 }
 
 #[derive(Clone)]
 pub struct AppState {
     pub rooms: Arc<Mutex<HashMap<String, Room>>>,
-    pub tx: tokio::sync::broadcast::Sender<String>
+    pub sender: tokio::sync::broadcast::Sender<String>,
 }
 
 impl AppState {
     pub fn new() -> AppState {
         return AppState {
             rooms: Arc::new(Mutex::new(HashMap::new())),
-            tx: tokio::sync::broadcast::channel(100).0,
+            sender: tokio::sync::broadcast::channel(100).0,
         };
     }
 }
