@@ -216,7 +216,7 @@ fn leave_room(state: &AppState, params: HashMap<String, String>) {
                 "character": prev_char,
             });
             state.sender.send(message.to_string()).unwrap();
-        },
+        }
         Err(e) => {
             let message = json!({
                 "room_id": &room_id,
