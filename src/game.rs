@@ -29,24 +29,24 @@ impl Room {
             None => {
                 self.x = Some(user_id);
                 return Ok('x');
-            },
+            }
             Some(assigned_user_id) => {
                 if assigned_user_id == user_id {
                     return Ok('x');
                 }
-            },
+            }
         }
 
         match self.o.clone() {
             None => {
                 self.o = Some(user_id);
                 return Ok('o');
-            },
+            }
             Some(assigned_user_id) => {
                 if assigned_user_id == user_id {
                     return Ok('o');
                 }
-            },
+            }
         }
 
         return Err(String::from("Room is already full"));
