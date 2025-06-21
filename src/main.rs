@@ -12,7 +12,7 @@ use serde_json::json;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod game;
-use crate::game::{AppState, Command, CommandType, Room};
+use crate::game::{AppState, CommandType, Room, WebSocketMessage};
 
 #[tokio::main]
 async fn main() {
@@ -91,22 +91,22 @@ async fn ws_handler(
 }
 
 fn handle_socket_recv(state: &AppState, message: Message) {
-    let command_result = serde_json::from_str(message.to_text().unwrap());
-    if let Err(e) = command_result {
+    let ws_message_result = serde_json::from_str::<WebSocketMessage>(message.to_text().unwrap());
+    if let Err(e) = ws_message_result {
         tracing::debug!("Client abruptly disconnected: {e}");
         return;
     }
-    let command: Command = command_result.unwrap();
-    match command.command {
+    let ws_message = ws_message_result.unwrap();
+    match ws_message.command {
         CommandType::Create => {
             create_room(state);
         }
         CommandType::Join => {
-            let params = command.params.unwrap();
+            let params = ws_message.params.unwrap();
             join_room(state, params);
         }
         CommandType::Leave => {
-            let params = command.params.unwrap();
+            let params = ws_message.params.unwrap();
             leave_room(state, params);
         }
     }

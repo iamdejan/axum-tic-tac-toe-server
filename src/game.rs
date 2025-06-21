@@ -123,7 +123,7 @@ pub enum CommandType {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct Command {
+pub struct WebSocketMessage {
     pub command: CommandType,
     pub params: Option<HashMap<String, String>>,
 }
