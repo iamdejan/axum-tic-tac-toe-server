@@ -65,7 +65,7 @@ async fn ws_handler(
                     match res {
                         Some(message_result) => {
                             if let Err(e) = message_result {
-                                tracing::debug!("Client abruptly disconnected: {e}");
+                                tracing::warn!("Client abruptly disconnected: {e}");
                                 continue
                             }
 
@@ -78,7 +78,7 @@ async fn ws_handler(
                     match res {
                         Ok(msg) => {
                             if let Err(e) = socket.send(Message::from(msg)).await {
-                                tracing::debug!("Client abruptly disconnected: {e}");
+                                tracing::warn!("Client abruptly disconnected: {e}");
                                 continue
                             }
                         },
@@ -93,7 +93,7 @@ async fn ws_handler(
 fn handle_socket_recv(state: &AppState, message: Message) {
     let ws_message_result = serde_json::from_str::<WebSocketMessage>(message.to_text().unwrap());
     if let Err(e) = ws_message_result {
-        tracing::debug!("Client abruptly disconnected: {e}");
+        tracing::warn!("Client abruptly disconnected: {e}");
         return;
     }
     let ws_message = ws_message_result.unwrap();
@@ -118,7 +118,10 @@ fn create_room(state: &AppState) {
         Ok(mut rooms) => {
             rooms.insert(room_id.clone(), Room::new());
         }
-        _ => {}
+        Err(e) => {
+            tracing::error!("Fail to lock room: {e}");
+            return;
+        }
     };
 
     let message = json!({
@@ -126,7 +129,7 @@ fn create_room(state: &AppState) {
     });
     let send_result = state.sender.send(message.to_string());
     if let Err(e) = send_result {
-        tracing::debug!("Client abruptly disconnected: {e}");
+        tracing::warn!("Client abruptly disconnected: {e}");
         return;
     }
 }
@@ -166,7 +169,7 @@ fn join_room(state: &AppState, params: HashMap<String, String>) {
         }
     };
     if let Err(e) = send_result {
-        tracing::debug!("Client abruptly disconnected: {e}");
+        tracing::warn!("Client abruptly disconnected: {e}");
         return;
     }
 
@@ -215,7 +218,7 @@ fn leave_room(state: &AppState, params: HashMap<String, String>) {
         }
     };
     if let Err(e) = send_result {
-        tracing::debug!("Client abruptly disconnected: {e}");
+        tracing::warn!("Client abruptly disconnected: {e}");
     }
 }
 
