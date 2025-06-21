@@ -69,7 +69,7 @@ async fn ws_handler(
                                 break
                             }
 
-                            handle_socket_recv(state.clone(), message_result).await;
+                            handle_socket_recv(&state, message_result).await;
                         },
                         _ => {},
                     }
@@ -89,7 +89,7 @@ async fn ws_handler(
     });
 }
 
-async fn handle_socket_recv(state: AppState, message_result: Result<Message, axum::Error>) {
+async fn handle_socket_recv(state: &AppState, message_result: Result<Message, axum::Error>) {
     let message = match message_result {
         Ok(msg) => msg,
         Err(e) => {
