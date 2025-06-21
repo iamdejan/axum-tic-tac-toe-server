@@ -105,7 +105,10 @@ fn handle_socket_recv(state: &AppState, message: Message) {
             let params = command.params.unwrap();
             join_room(state, params);
         }
-        CommandType::Leave => todo!(),
+        CommandType::Leave => {
+            let params = command.params.unwrap();
+            leave_room(state, params);
+        },
     }
 }
 
@@ -138,7 +141,7 @@ fn join_room(state: &AppState, params: HashMap<String, String>) {
             "user_id": user_id,
             "error": "Room is already full"
         });
-        state.sender.send(message.to_string()).unwrap(); // ignore error handling for now
+        state.sender.send(message.to_string()).unwrap();
         return;
     }
 
@@ -177,7 +180,22 @@ fn join_room(state: &AppState, params: HashMap<String, String>) {
             "room_id": &room_id,
             "status": "GAME_STARTED"
         });
-        state.sender.send(message.to_string()).unwrap(); // ignore error handling for now
+        state.sender.send(message.to_string()).unwrap();
+    }
+}
+
+fn leave_room(state: &AppState, params: HashMap<String, String>) {
+    let room_id = params.get("room_id").unwrap().to_string();
+    let user_id = params.get("user_id").unwrap().to_string();
+
+    let is_game_started = is_game_started(state, &room_id);
+    if is_game_started {
+        let message = json!({
+            "room_id": &room_id,
+            "error": "Game has already started!",
+            "user_id": &user_id
+        });
+        state.sender.send(message.to_string()).unwrap();
     }
 }
 
@@ -190,6 +208,18 @@ fn is_room_full(state: &AppState, room_id: &String) -> bool {
                 }
 
                 room.is_full()
+            }
+            None => false,
+        },
+        Err(_) => false,
+    };
+}
+
+fn is_game_started(state: &AppState, room_id: &String) -> bool {
+    return match state.rooms.lock() {
+        Ok(mut rooms) => match rooms.get_mut(room_id) {
+            Some(room) => {
+                room.is_game_started()
             }
             None => false,
         },
