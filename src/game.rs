@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 pub struct Room {
     x: Option<String>,
     o: Option<String>,
-    _board: [[Option<char>; 3]; 3],
+    board: [[Option<char>; 3]; 3],
     current_turn: Option<char>,
     winner: Option<String>,
 }
@@ -18,7 +18,7 @@ impl Room {
         return Room {
             x: None,
             o: None,
-            _board: [[None; 3]; 3],
+            board: [[None; 3]; 3],
             current_turn: None,
             winner: None,
         };
@@ -92,6 +92,40 @@ impl Room {
         return self.current_turn.is_some();
     }
 
+    /// get_character is a function that returns the character of the user.
+    pub fn get_character(&self, user_id: &String) -> Option<char> {
+        let x = self.x.as_ref();
+        if let Some(value) = x {
+            if value == user_id {
+                return Some('x');
+            }
+        }
+
+        let o = self.o.as_ref();
+        if let Some(value) = o {
+            if value == user_id {
+                return Some('o');
+            }
+        }
+
+        return None;
+    }
+
+    pub fn register_move(
+        &mut self,
+        row: usize,
+        column: usize,
+        character: char,
+    ) -> Result<[[Option<char>; 3]; 3], String> {
+        let square = self.board.get_mut(row).unwrap().get_mut(column).unwrap();
+        if square.is_some() {
+            return Err(String::from("invalid move"));
+        }
+
+        let _ = square.insert(character);
+        return Ok(self.board.clone());
+    }
+
     pub fn is_game_ended(&self) -> bool {
         return self.winner.is_some();
     }
@@ -120,6 +154,8 @@ pub enum CommandType {
     Join,
     #[serde(alias = "leave")]
     Leave,
+    #[serde(alias = "move")]
+    Move,
 }
 
 #[derive(Serialize, Deserialize)]

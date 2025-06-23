@@ -65,7 +65,7 @@ async fn ws_handler(
                     match res {
                         Some(message_result) => {
                             if let Err(e) = message_result {
-                                tracing::warn!("Client abruptly disconnected: {e}");
+                                tracing::warn!("Error on receiving message from socket: {e}");
                                 continue
                             }
 
@@ -78,7 +78,7 @@ async fn ws_handler(
                     match res {
                         Ok(msg) => {
                             if let Err(e) = socket.send(Message::from(msg)).await {
-                                tracing::warn!("Client abruptly disconnected: {e}");
+                                tracing::warn!("Error on receiving message from state's sender: {e}");
                                 continue
                             }
                         },
@@ -93,7 +93,7 @@ async fn ws_handler(
 fn handle_socket_recv(state: &AppState, message: Message) {
     let ws_message_result = serde_json::from_str::<WebSocketMessage>(message.to_text().unwrap());
     if let Err(e) = ws_message_result {
-        tracing::warn!("Client abruptly disconnected: {e}");
+        tracing::warn!("Fail to parse message: {e}");
         return;
     }
     let ws_message = ws_message_result.unwrap();
@@ -108,6 +108,10 @@ fn handle_socket_recv(state: &AppState, message: Message) {
         CommandType::Leave => {
             let params = ws_message.params.unwrap();
             leave_room(state, params);
+        }
+        CommandType::Move => {
+            let params = ws_message.params.unwrap();
+            register_move(state, params);
         }
     }
 }
@@ -129,7 +133,7 @@ fn create_room(state: &AppState) {
     });
     let send_result = state.sender.send(message.to_string());
     if let Err(e) = send_result {
-        tracing::warn!("Client abruptly disconnected: {e}");
+        tracing::warn!("Send message failed: {e}");
         return;
     }
 }
@@ -169,7 +173,7 @@ fn join_room(state: &AppState, params: HashMap<String, String>) {
         }
     };
     if let Err(e) = send_result {
-        tracing::warn!("Client abruptly disconnected: {e}");
+        tracing::warn!("Send message failed: {e}");
         return;
     }
 
@@ -218,7 +222,58 @@ fn leave_room(state: &AppState, params: HashMap<String, String>) {
         }
     };
     if let Err(e) = send_result {
-        tracing::warn!("Client abruptly disconnected: {e}");
+        tracing::warn!("Send message failed: {e}");
+    }
+}
+
+fn register_move(state: &AppState, params: HashMap<String, String>) {
+    let room_id = params.get("room_id").unwrap().to_string();
+    let user_id = params.get("user_id").unwrap().to_string();
+    let row = params
+        .get("row")
+        .unwrap()
+        .to_string()
+        .parse::<usize>()
+        .unwrap();
+    let column = params
+        .get("column")
+        .unwrap()
+        .to_string()
+        .parse::<usize>()
+        .unwrap();
+
+    let character = get_room_and_execute(state, &room_id, |room| {
+        let result = room.get_character(&user_id);
+        return match result {
+            Some(value) => Ok(value),
+            None => Err(String::from("User not found")),
+        };
+    })
+    .unwrap();
+    let register_move_result = get_room_and_execute(state, &room_id, |room| {
+        room.register_move(row, column, character)
+    });
+    let send_result = match register_move_result {
+        Ok(board) => {
+            let message = json!({
+                "room_id": &room_id,
+                "user_id": &user_id,
+                "event": "GAME_MOVE",
+                "board_after_move": board
+            });
+            state.sender.send(message.to_string())
+        }
+        Err(e) => {
+            let message = json!({
+                "room_id": &room_id,
+                "user_id": user_id,
+                "error": e,
+            });
+            state.sender.send(message.to_string())
+        }
+    };
+    if let Err(e) = send_result {
+        tracing::warn!("Send message failed: {e}");
     }
 }
 
