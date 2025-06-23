@@ -109,6 +109,10 @@ fn handle_socket_recv(state: &AppState, message: Message) {
             let params = ws_message.params.unwrap();
             leave_room(state, params);
         }
+        CommandType::Move => {
+            let params = ws_message.params.unwrap();
+            register_move(state, params);
+        }
     }
 }
 
@@ -205,6 +209,57 @@ fn leave_room(state: &AppState, params: HashMap<String, String>) {
                 "user_id": &user_id,
                 "event": "ROOM_LEFT",
                 "character": prev_char,
+            });
+            state.sender.send(message.to_string())
+        }
+        Err(e) => {
+            let message = json!({
+                "room_id": &room_id,
+                "user_id": user_id,
+                "error": e,
+            });
+            state.sender.send(message.to_string())
+        }
+    };
+    if let Err(e) = send_result {
+        tracing::warn!("Client abruptly disconnected: {e}");
+    }
+}
+
+fn register_move(state: &AppState, params: HashMap<String, String>) {
+    let room_id = params.get("room_id").unwrap().to_string();
+    let user_id = params.get("user_id").unwrap().to_string();
+    let row = params
+        .get("row")
+        .unwrap()
+        .to_string()
+        .parse::<usize>()
+        .unwrap();
+    let column = params
+        .get("column")
+        .unwrap()
+        .to_string()
+        .parse::<usize>()
+        .unwrap();
+
+    let character = get_room_and_execute(state, &room_id, |room| {
+        let result = room.get_character(&user_id);
+        return match result {
+            Some(value) => Ok(value),
+            None => Err(String::from("User not found")),
+        };
+    })
+    .unwrap();
+    let register_move_result = get_room_and_execute(state, &room_id, |room| {
+        room.register_move(row, column, character)
+    });
+    let send_result = match register_move_result {
+        Ok(board) => {
+            let message = json!({
+                "room_id": &room_id,
+                "user_id": &user_id,
+                "event": "GAME_MOVE",
+                "board_after_move": board
             });
             state.sender.send(message.to_string())
         }
