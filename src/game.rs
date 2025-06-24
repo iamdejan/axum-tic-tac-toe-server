@@ -10,7 +10,7 @@ pub struct Room {
     o: Option<String>,
     board: [[Option<char>; 3]; 3],
     current_turn: Option<char>,
-    winner: Option<String>,
+    winner: Option<char>,
 }
 
 impl Room {
@@ -124,6 +124,65 @@ impl Room {
 
         let _ = square.insert(character);
         return Ok(self.board.clone());
+    }
+
+    fn check_winner(&mut self) {
+        // traverse left -> right
+        for r in 0..=2 {
+            let mut same_char = true;
+            for c in 1..=2 {
+                if self.board[r][c].unwrap() != self.board[r][c-1].unwrap() {
+                    same_char = false;
+                    break;
+                }
+            }
+            if same_char {
+                let _ = self.winner.insert(self.board[r][0].unwrap());
+            }
+        }
+
+        // column
+        for c in 0..=2 {
+            let mut same_char = true;
+            for r in 1..=2 {
+                if self.board[r][c].unwrap() != self.board[r-1][c].unwrap() {
+                    same_char = false;
+                    break;
+                }
+            }
+            if same_char {
+                let _ = self.winner.insert(self.board[0][c].unwrap());
+            }
+        }
+
+        // diagonal: top left -> bottom right
+        let mut same_char = true;
+        for i in 1..=2 {
+            if self.board[i][i].unwrap() != self.board[i-1][i-1].unwrap() {
+                same_char = false;
+                break;
+            }
+        }
+        if same_char {
+            let _ = self.winner.insert(self.board[0][0].unwrap());
+        }
+
+        // diagonal: top right -> bottom left
+        let mut same_char = true;
+        let mut r = 1;
+        let mut c = 1;
+        while r <= 2 {
+            if self.board[r][c].unwrap() != self.board[r-1][c+1].unwrap() {
+                same_char = false;
+                break;
+            }
+
+            r += 1;
+            c -= 1;
+        }
+        if same_char {
+            let _ = self.winner.insert(self.board[0][2].unwrap());
+        }
     }
 
     pub fn is_game_ended(&self) -> bool {
