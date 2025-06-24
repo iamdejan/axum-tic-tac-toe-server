@@ -10,7 +10,7 @@ pub struct Room {
     o: Option<String>,
     board: [[Option<char>; 3]; 3],
     current_turn: Option<char>,
-    winner: Option<String>,
+    winner: Option<char>,
 }
 
 impl Room {
@@ -88,7 +88,7 @@ impl Room {
         self.current_turn = Option::Some('x');
     }
 
-    pub fn is_game_started(&self) -> bool {
+    pub fn has_game_started(&self) -> bool {
         return self.current_turn.is_some();
     }
 
@@ -126,7 +126,100 @@ impl Room {
         return Ok(self.board.clone());
     }
 
-    pub fn is_game_ended(&self) -> bool {
+    fn check_winner(&self) -> Option<char> {
+        // left -> right
+        for r in 0..=2 {
+            let mut same_char = true;
+            for c in 1..=2 {
+                let prev = self.board[r][c - 1];
+                let curr = self.board[r][c];
+                if prev.is_none() || curr.is_none() || curr.unwrap() != prev.unwrap() {
+                    same_char = false;
+                    break;
+                }
+            }
+            if same_char {
+                return self.board[r][0];
+            }
+        }
+
+        // top -> bottom
+        for c in 0..=2 {
+            let mut same_char = true;
+            for r in 1..=2 {
+                let prev = self.board[r - 1][c];
+                let curr = self.board[r][c];
+                if prev.is_none() || curr.is_none() || curr.unwrap() != prev.unwrap() {
+                    same_char = false;
+                    break;
+                }
+            }
+            if same_char {
+                return self.board[0][c];
+            }
+        }
+
+        // diagonal: top left -> bottom right
+        let mut same_char = true;
+        for i in 1..=2 {
+            let prev = self.board[i - 1][i - 1];
+            let curr = self.board[i][i];
+            if prev.is_none() || curr.is_none() || curr.unwrap() != prev.unwrap() {
+                same_char = false;
+                break;
+            }
+        }
+        if same_char {
+            return self.board[0][0];
+        }
+
+        // diagonal: top right -> bottom left
+        let mut same_char = true;
+        let mut r = 1;
+        let mut c = 1;
+        while r <= 2 {
+            let prev = self.board[r - 1][c + 1];
+            let curr = self.board[r][c];
+            if prev.is_none() || curr.is_none() || curr.unwrap() != prev.unwrap() {
+                same_char = false;
+                break;
+            }
+
+            if c == 0 {
+                break;
+            }
+
+            r += 1;
+            c -= 1;
+        }
+        if same_char {
+            return self.board[0][2];
+        }
+
+        return None;
+    }
+
+    pub fn check_and_set_winner(&mut self) -> Option<char> {
+        let winner = self.check_winner();
+        self.winner = winner;
+        return winner;
+    }
+
+    pub fn get_user_id_from_character(&self, character: char) -> Option<(char, String)> {
+        return match character {
+            'x' => match self.x.clone() {
+                Some(user_id) => Some(('x', user_id)),
+                _ => None,
+            },
+            'o' => match self.o.clone() {
+                Some(user_id) => Some(('o', user_id)),
+                _ => None,
+            },
+            _ => None,
+        };
+    }
+
+    pub fn has_game_finished(&self) -> bool {
         return self.winner.is_some();
     }
 }

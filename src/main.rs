@@ -141,6 +141,18 @@ fn create_room(state: &AppState) {
 fn join_room(state: &AppState, params: HashMap<String, String>) {
     let room_id = params.get("room_id").unwrap().to_string();
     let user_id = params.get("user_id").unwrap().to_string();
+
+    let is_game_started = has_game_started(state, &room_id);
+    if is_game_started {
+        let message = json!({
+            "room_id": &room_id,
+            "error": "Game has already started!",
+            "user_id": &user_id
+        });
+        state.sender.send(message.to_string()).unwrap();
+        return;
+    }
+
     let is_full = is_room_full(&state, &room_id);
     if is_full {
         let message = json!({
@@ -152,7 +164,8 @@ fn join_room(state: &AppState, params: HashMap<String, String>) {
         return;
     }
 
-    let character_result = get_room_and_execute(state, &room_id, |room| room.join(user_id.clone()));
+    let character_result =
+        get_room_and_execute_result(state, &room_id, |room| room.join(user_id.clone()));
     let send_result = match character_result {
         Ok(character) => {
             let message = json!({
@@ -190,7 +203,7 @@ fn leave_room(state: &AppState, params: HashMap<String, String>) {
     let room_id = params.get("room_id").unwrap().to_string();
     let user_id = params.get("user_id").unwrap().to_string();
 
-    let is_game_started = is_game_started(state, &room_id);
+    let is_game_started = has_game_started(state, &room_id);
     if is_game_started {
         let message = json!({
             "room_id": &room_id,
@@ -201,7 +214,8 @@ fn leave_room(state: &AppState, params: HashMap<String, String>) {
         return;
     }
 
-    let leave_result = get_room_and_execute(state, &room_id, |room| room.leave(user_id.clone()));
+    let leave_result =
+        get_room_and_execute_result(state, &room_id, |room| room.leave(user_id.clone()));
     let send_result = match leave_result {
         Ok(prev_char) => {
             let message = json!({
@@ -229,6 +243,18 @@ fn leave_room(state: &AppState, params: HashMap<String, String>) {
 fn register_move(state: &AppState, params: HashMap<String, String>) {
     let room_id = params.get("room_id").unwrap().to_string();
     let user_id = params.get("user_id").unwrap().to_string();
+
+    let has_game_finished = has_game_finished(state, &room_id);
+    if has_game_finished {
+        let message = json!({
+            "room_id": &room_id,
+            "error": "Game has already finished!",
+            "user_id": &user_id
+        });
+        state.sender.send(message.to_string()).unwrap();
+        return;
+    }
+
     let row = params
         .get("row")
         .unwrap()
@@ -242,7 +268,7 @@ fn register_move(state: &AppState, params: HashMap<String, String>) {
         .parse::<usize>()
         .unwrap();
 
-    let character = get_room_and_execute(state, &room_id, |room| {
+    let character = get_room_and_execute_result(state, &room_id, |room| {
         let result = room.get_character(&user_id);
         return match result {
             Some(value) => Ok(value),
@@ -250,7 +276,7 @@ fn register_move(state: &AppState, params: HashMap<String, String>) {
         };
     })
     .unwrap();
-    let register_move_result = get_room_and_execute(state, &room_id, |room| {
+    let register_move_result = get_room_and_execute_result(state, &room_id, |room| {
         room.register_move(row, column, character)
     });
     let send_result = match register_move_result {
@@ -258,7 +284,7 @@ fn register_move(state: &AppState, params: HashMap<String, String>) {
             let message = json!({
                 "room_id": &room_id,
                 "user_id": &user_id,
-                "event": "GAME_MOVE",
+                "event": "MOVE_REGISTERED",
                 "board_after_move": board
             });
             state.sender.send(message.to_string())
@@ -275,11 +301,29 @@ fn register_move(state: &AppState, params: HashMap<String, String>) {
     if let Err(e) = send_result {
         tracing::warn!("Send message failed: {e}");
     }
+
+    let winner_user_result = get_room_and_execute_option(state, &room_id, |room| {
+        let w = room.check_and_set_winner();
+        match w {
+            Some(character) => room.get_user_id_from_character(character),
+            _ => None,
+        }
+    });
+    if let Some(winner_user) = winner_user_result {
+        let message = json!({
+            "room_id": &room_id,
+            "user_id": &user_id,
+            "event": "GAME_FINISHED",
+            "winner_user_id": winner_user.1,
+            "winner_character": winner_user.0,
+        });
+        state.sender.send(message.to_string()).unwrap();
+    }
 }
 
 fn is_room_full(state: &AppState, room_id: &String) -> bool {
-    let result = get_room_and_execute(state, room_id, |room| {
-        if room.is_full() && !room.is_game_started() && !room.is_game_ended() {
+    let result = get_room_and_execute_result(state, room_id, |room| {
+        if room.is_full() && !room.has_game_started() && !room.has_game_finished() {
             room.start_game();
         }
 
@@ -291,18 +335,26 @@ fn is_room_full(state: &AppState, room_id: &String) -> bool {
     };
 }
 
-fn is_game_started(state: &AppState, room_id: &String) -> bool {
-    let result = get_room_and_execute(state, room_id, |room| Ok(room.is_game_started()));
+fn has_game_started(state: &AppState, room_id: &String) -> bool {
+    let result = get_room_and_execute_result(state, room_id, |room| Ok(room.has_game_started()));
     return match result {
         Ok(b) => b,
         Err(_) => false,
     };
 }
 
-// references:
-// - https://www.reddit.com/r/learnrust/comments/xvxpy2/is_there_a_workaround_for_variable_capturing_in/
-// - https://doc.rust-lang.org/book/ch13-01-closures.html
-fn get_room_and_execute<T, F>(state: &AppState, room_id: &String, f: F) -> Result<T, String>
+fn has_game_finished(state: &AppState, room_id: &String) -> bool {
+    let result = get_room_and_execute_result(state, room_id, |room| Ok(room.has_game_finished()));
+    return match result {
+        Ok(b) => b,
+        Err(_) => false,
+    };
+}
+
+/// references:
+/// - https://www.reddit.com/r/learnrust/comments/xvxpy2/is_there_a_workaround_for_variable_capturing_in/
+/// - https://doc.rust-lang.org/book/ch13-01-closures.html
+fn get_room_and_execute_result<T, F>(state: &AppState, room_id: &String, f: F) -> Result<T, String>
 where
     F: FnOnce(&mut Room) -> Result<T, String>,
 {
@@ -312,5 +364,21 @@ where
             None => Err(String::from("Room not found")),
         },
         Err(e) => Err(format!("Fail to lock room: {}", e).to_string()),
+    };
+}
+
+/// references:
+/// - https://www.reddit.com/r/learnrust/comments/xvxpy2/is_there_a_workaround_for_variable_capturing_in/
+/// - https://doc.rust-lang.org/book/ch13-01-closures.html
+fn get_room_and_execute_option<T, F>(state: &AppState, room_id: &String, f: F) -> Option<T>
+where
+    F: FnOnce(&mut Room) -> Option<T>,
+{
+    return match state.rooms.lock() {
+        Ok(mut rooms) => match rooms.get_mut(room_id) {
+            Some(room) => f(room),
+            None => None,
+        },
+        Err(_) => None,
     };
 }
