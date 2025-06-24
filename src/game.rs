@@ -131,7 +131,7 @@ impl Room {
         for r in 0..=2 {
             let mut same_char = true;
             for c in 1..=2 {
-                let prev = self.board[r][c-1];
+                let prev = self.board[r][c - 1];
                 let curr = self.board[r][c];
                 if prev.is_none() || curr.is_none() || curr.unwrap() != prev.unwrap() {
                     same_char = false;
@@ -147,7 +147,7 @@ impl Room {
         for c in 0..=2 {
             let mut same_char = true;
             for r in 1..=2 {
-                let prev = self.board[r][c-1];
+                let prev = self.board[r][c - 1];
                 let curr = self.board[r][c];
                 if prev.is_none() || curr.is_none() || curr.unwrap() != prev.unwrap() {
                     same_char = false;
@@ -162,7 +162,7 @@ impl Room {
         // diagonal: top left -> bottom right
         let mut same_char = true;
         for i in 1..=2 {
-            let prev = self.board[i-1][i-1];
+            let prev = self.board[i - 1][i - 1];
             let curr = self.board[i][i];
             if prev.is_none() || curr.is_none() || curr.unwrap() != prev.unwrap() {
                 same_char = false;
@@ -178,7 +178,7 @@ impl Room {
         let mut r = 1;
         let mut c = 1;
         while r <= 2 {
-            let prev = self.board[r-1][c+1];
+            let prev = self.board[r - 1][c + 1];
             let curr = self.board[r][c];
             if prev.is_none() || curr.is_none() || curr.unwrap() != prev.unwrap() {
                 same_char = false;
@@ -195,17 +195,24 @@ impl Room {
         return None;
     }
 
-    fn check_and_set_winner(&mut self) {
+    pub fn check_and_set_winner(&mut self) -> Option<char> {
         let winner = self.check_winner();
         self.winner = winner;
+        return winner;
     }
 
-    fn get_user_id_from_character(&self, character: char) -> Option<String> {
+    pub fn get_user_id_from_character(&self, character: char) -> Option<(char, String)> {
         return match character {
-            'x' => self.x.clone(),
-            'o' => self.o.clone(),
-            _ => None
-        }
+            'x' => match self.x.clone() {
+                Some(user_id) => Some(('x', user_id)),
+                _ => None,
+            },
+            'o' => match self.o.clone() {
+                Some(user_id) => Some(('o', user_id)),
+                _ => None,
+            },
+            _ => None,
+        };
     }
 
     pub fn is_game_ended(&self) -> bool {
