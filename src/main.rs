@@ -243,6 +243,18 @@ fn leave_room(state: &AppState, params: HashMap<String, String>) {
 fn register_move(state: &AppState, params: HashMap<String, String>) {
     let room_id = params.get("room_id").unwrap().to_string();
     let user_id = params.get("user_id").unwrap().to_string();
+
+    let has_game_finished = has_game_finished(state, &room_id);
+    if has_game_finished {
+        let message = json!({
+            "room_id": &room_id,
+            "error": "Game has already finished!",
+            "user_id": &user_id
+        });
+        state.sender.send(message.to_string()).unwrap();
+        return;
+    }
+
     let row = params
         .get("row")
         .unwrap()
@@ -311,7 +323,7 @@ fn register_move(state: &AppState, params: HashMap<String, String>) {
 
 fn is_room_full(state: &AppState, room_id: &String) -> bool {
     let result = get_room_and_execute_result(state, room_id, |room| {
-        if room.is_full() && !room.has_game_started() && !room.is_game_ended() {
+        if room.is_full() && !room.has_game_started() && !room.has_game_finished() {
             room.start_game();
         }
 
@@ -325,6 +337,14 @@ fn is_room_full(state: &AppState, room_id: &String) -> bool {
 
 fn has_game_started(state: &AppState, room_id: &String) -> bool {
     let result = get_room_and_execute_result(state, room_id, |room| Ok(room.has_game_started()));
+    return match result {
+        Ok(b) => b,
+        Err(_) => false,
+    };
+}
+
+fn has_game_finished(state: &AppState, room_id: &String) -> bool {
+    let result = get_room_and_execute_result(state, room_id, |room| Ok(room.has_game_finished()));
     return match result {
         Ok(b) => b,
         Err(_) => false,

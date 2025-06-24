@@ -215,7 +215,7 @@ impl Room {
         };
     }
 
-    pub fn is_game_ended(&self) -> bool {
+    pub fn has_game_finished(&self) -> bool {
         return self.winner.is_some();
     }
 }
