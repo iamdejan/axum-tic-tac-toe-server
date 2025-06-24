@@ -142,8 +142,8 @@ fn join_room(state: &AppState, params: HashMap<String, String>) {
     let room_id = params.get("room_id").unwrap().to_string();
     let user_id = params.get("user_id").unwrap().to_string();
 
-     let is_game_started = has_game_started(state, &room_id);
-     if is_game_started {
+    let is_game_started = has_game_started(state, &room_id);
+    if is_game_started {
         let message = json!({
             "room_id": &room_id,
             "error": "Game has already started!",

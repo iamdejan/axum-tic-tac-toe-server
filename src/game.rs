@@ -147,7 +147,7 @@ impl Room {
         for c in 0..=2 {
             let mut same_char = true;
             for r in 1..=2 {
-                let prev = self.board[r-1][c];
+                let prev = self.board[r - 1][c];
                 let curr = self.board[r][c];
                 if prev.is_none() || curr.is_none() || curr.unwrap() != prev.unwrap() {
                     same_char = false;
@@ -182,6 +182,10 @@ impl Room {
             let curr = self.board[r][c];
             if prev.is_none() || curr.is_none() || curr.unwrap() != prev.unwrap() {
                 same_char = false;
+                break;
+            }
+
+            if c == 0 {
                 break;
             }
 
