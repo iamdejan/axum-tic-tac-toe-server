@@ -127,7 +127,7 @@ impl Room {
     }
 
     fn check_winner(&self) -> Option<char> {
-        // traverse left -> right
+        // left -> right
         for r in 0..=2 {
             let mut same_char = true;
             for c in 1..=2 {
@@ -143,11 +143,11 @@ impl Room {
             }
         }
 
-        // column
+        // top -> bottom
         for c in 0..=2 {
             let mut same_char = true;
             for r in 1..=2 {
-                let prev = self.board[r][c - 1];
+                let prev = self.board[r-1][c];
                 let curr = self.board[r][c];
                 if prev.is_none() || curr.is_none() || curr.unwrap() != prev.unwrap() {
                     same_char = false;
