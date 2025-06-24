@@ -126,18 +126,20 @@ impl Room {
         return Ok(self.board.clone());
     }
 
-    fn check_winner(&mut self) {
+    fn check_winner(&self) -> Option<char> {
         // traverse left -> right
         for r in 0..=2 {
             let mut same_char = true;
             for c in 1..=2 {
-                if self.board[r][c].unwrap() != self.board[r][c-1].unwrap() {
+                let prev = self.board[r][c-1];
+                let curr = self.board[r][c];
+                if prev.is_none() || curr.is_none() || curr.unwrap() != prev.unwrap() {
                     same_char = false;
                     break;
                 }
             }
             if same_char {
-                let _ = self.winner.insert(self.board[r][0].unwrap());
+                return self.board[r][0];
             }
         }
 
@@ -145,26 +147,30 @@ impl Room {
         for c in 0..=2 {
             let mut same_char = true;
             for r in 1..=2 {
-                if self.board[r][c].unwrap() != self.board[r-1][c].unwrap() {
+                let prev = self.board[r][c-1];
+                let curr = self.board[r][c];
+                if prev.is_none() || curr.is_none() || curr.unwrap() != prev.unwrap() {
                     same_char = false;
                     break;
                 }
             }
             if same_char {
-                let _ = self.winner.insert(self.board[0][c].unwrap());
+                return self.board[0][c];
             }
         }
 
         // diagonal: top left -> bottom right
         let mut same_char = true;
         for i in 1..=2 {
-            if self.board[i][i].unwrap() != self.board[i-1][i-1].unwrap() {
+            let prev = self.board[i-1][i-1];
+            let curr = self.board[i][i];
+            if prev.is_none() || curr.is_none() || curr.unwrap() != prev.unwrap() {
                 same_char = false;
                 break;
             }
         }
         if same_char {
-            let _ = self.winner.insert(self.board[0][0].unwrap());
+            return self.board[0][0];
         }
 
         // diagonal: top right -> bottom left
@@ -172,7 +178,9 @@ impl Room {
         let mut r = 1;
         let mut c = 1;
         while r <= 2 {
-            if self.board[r][c].unwrap() != self.board[r-1][c+1].unwrap() {
+            let prev = self.board[r-1][c+1];
+            let curr = self.board[r][c];
+            if prev.is_none() || curr.is_none() || curr.unwrap() != prev.unwrap() {
                 same_char = false;
                 break;
             }
@@ -181,7 +189,22 @@ impl Room {
             c -= 1;
         }
         if same_char {
-            let _ = self.winner.insert(self.board[0][2].unwrap());
+            return self.board[0][2];
+        }
+
+        return None;
+    }
+
+    fn check_and_set_winner(&mut self) {
+        let winner = self.check_winner();
+        self.winner = winner;
+    }
+
+    fn get_user_id_from_character(&self, character: char) -> Option<String> {
+        return match character {
+            'x' => self.x.clone(),
+            'o' => self.o.clone(),
+            _ => None
         }
     }
 
