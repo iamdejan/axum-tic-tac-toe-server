@@ -141,6 +141,18 @@ fn create_room(state: &AppState) {
 fn join_room(state: &AppState, params: HashMap<String, String>) {
     let room_id = params.get("room_id").unwrap().to_string();
     let user_id = params.get("user_id").unwrap().to_string();
+
+     let is_game_started = has_game_started(state, &room_id);
+     if is_game_started {
+        let message = json!({
+            "room_id": &room_id,
+            "error": "Game has already started!",
+            "user_id": &user_id
+        });
+        state.sender.send(message.to_string()).unwrap();
+        return;
+    }
+
     let is_full = is_room_full(&state, &room_id);
     if is_full {
         let message = json!({
@@ -191,7 +203,7 @@ fn leave_room(state: &AppState, params: HashMap<String, String>) {
     let room_id = params.get("room_id").unwrap().to_string();
     let user_id = params.get("user_id").unwrap().to_string();
 
-    let is_game_started = is_game_started(state, &room_id);
+    let is_game_started = has_game_started(state, &room_id);
     if is_game_started {
         let message = json!({
             "room_id": &room_id,
@@ -260,7 +272,7 @@ fn register_move(state: &AppState, params: HashMap<String, String>) {
             let message = json!({
                 "room_id": &room_id,
                 "user_id": &user_id,
-                "event": "GAME_MOVE",
+                "event": "MOVE_REGISTERED",
                 "board_after_move": board
             });
             state.sender.send(message.to_string())
@@ -299,7 +311,7 @@ fn register_move(state: &AppState, params: HashMap<String, String>) {
 
 fn is_room_full(state: &AppState, room_id: &String) -> bool {
     let result = get_room_and_execute_result(state, room_id, |room| {
-        if room.is_full() && !room.is_game_started() && !room.is_game_ended() {
+        if room.is_full() && !room.has_game_started() && !room.is_game_ended() {
             room.start_game();
         }
 
@@ -311,8 +323,8 @@ fn is_room_full(state: &AppState, room_id: &String) -> bool {
     };
 }
 
-fn is_game_started(state: &AppState, room_id: &String) -> bool {
-    let result = get_room_and_execute_result(state, room_id, |room| Ok(room.is_game_started()));
+fn has_game_started(state: &AppState, room_id: &String) -> bool {
+    let result = get_room_and_execute_result(state, room_id, |room| Ok(room.has_game_started()));
     return match result {
         Ok(b) => b,
         Err(_) => false,

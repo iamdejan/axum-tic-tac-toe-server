@@ -88,7 +88,7 @@ impl Room {
         self.current_turn = Option::Some('x');
     }
 
-    pub fn is_game_started(&self) -> bool {
+    pub fn has_game_started(&self) -> bool {
         return self.current_turn.is_some();
     }
 
