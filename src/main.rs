@@ -63,15 +63,12 @@ async fn ws_handler(
             tokio::select! {
                 res = socket.recv() => {
                     match res {
-                        Some(message_result) => {
-                            if let Err(e) = message_result {
-                                tracing::warn!("Error on receiving message from socket: {e}");
-                                continue
-                            }
-
-                            handle_socket_recv(&state, message_result.unwrap());
+                        Some(Ok(Message::Text(message_text))) => {
+                            handle_socket_recv(&state, message_text.to_string());
                         },
-                        _ => {},
+                        Some(Ok(_)) => {},
+                        Some(Err(e)) => tracing::warn!("Client disconnected abruptly: {e}"),
+                        _ => break,
                     }
                 }
                 res = receiver.recv() => {
@@ -90,10 +87,10 @@ async fn ws_handler(
     });
 }
 
-fn handle_socket_recv(state: &AppState, message: Message) {
-    let ws_message_result = serde_json::from_str::<WebSocketMessage>(message.to_text().unwrap());
+fn handle_socket_recv(state: &AppState, message_text: String) {
+    let ws_message_result = serde_json::from_str::<WebSocketMessage>(&message_text);
     if let Err(e) = ws_message_result {
-        tracing::warn!("Fail to parse message: {e}");
+        tracing::warn!("Fail to parse message: {e}, original message: {message_text}");
         return;
     }
     let ws_message = ws_message_result.unwrap();
