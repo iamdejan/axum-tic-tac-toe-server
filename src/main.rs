@@ -273,6 +273,21 @@ fn register_move(state: &AppState, params: HashMap<String, String>) {
         };
     })
     .unwrap();
+
+    let expected_character_option =
+        get_room_and_execute_option(state, &room_id, |room| room.get_current_turn());
+    if let Some(expected_character) = expected_character_option {
+        if character != expected_character {
+            let message = json!({
+                "room_id": &room_id,
+                "user_id": user_id,
+                "error": "Invalid character",
+            });
+            state.sender.send(message.to_string()).unwrap();
+            return;
+        }
+    }
+
     let register_move_result = get_room_and_execute_result(state, &room_id, |room| {
         room.register_move(row, column, character)
     });
@@ -297,6 +312,7 @@ fn register_move(state: &AppState, params: HashMap<String, String>) {
     };
     if let Err(e) = send_result {
         tracing::warn!("Send message failed: {e}");
+        return;
     }
 
     let winner_user_result = get_room_and_execute_option(state, &room_id, |room| {
