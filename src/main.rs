@@ -94,27 +94,27 @@ fn handle_socket_recv(state: &AppState, message_text: String) {
         return;
     }
     let ws_message = ws_message_result.unwrap();
+    let params = ws_message.params.unwrap();
     match ws_message.command {
         CommandType::Create => {
-            create_room(state);
+            create_room(state, params);
         }
         CommandType::Join => {
-            let params = ws_message.params.unwrap();
             join_room(state, params);
         }
         CommandType::Leave => {
-            let params = ws_message.params.unwrap();
             leave_room(state, params);
         }
         CommandType::Move => {
-            let params = ws_message.params.unwrap();
             register_move(state, params);
         }
     }
 }
 
-fn create_room(state: &AppState) {
+fn create_room(state: &AppState, params: HashMap<String, String>) {
+    let user_id = params.get("user_id").unwrap().to_string();
     let room_id = uuid::Uuid::now_v7().to_string();
+
     match state.rooms.lock() {
         Ok(mut rooms) => {
             rooms.insert(room_id.clone(), Room::new());
@@ -126,7 +126,8 @@ fn create_room(state: &AppState) {
     };
 
     let message = json!({
-        "room_id": room_id
+        "room_id": room_id,
+        "user_id": &user_id,
     });
     let send_result = state.sender.send(message.to_string());
     if let Err(e) = send_result {
@@ -273,6 +274,21 @@ fn register_move(state: &AppState, params: HashMap<String, String>) {
         };
     })
     .unwrap();
+
+    let expected_character_option =
+        get_room_and_execute_option(state, &room_id, |room| room.get_current_turn());
+    if let Some(expected_character) = expected_character_option {
+        if character != expected_character {
+            let message = json!({
+                "room_id": &room_id,
+                "user_id": user_id,
+                "error": "Invalid character",
+            });
+            state.sender.send(message.to_string()).unwrap();
+            return;
+        }
+    }
+
     let register_move_result = get_room_and_execute_result(state, &room_id, |room| {
         room.register_move(row, column, character)
     });
@@ -297,6 +313,7 @@ fn register_move(state: &AppState, params: HashMap<String, String>) {
     };
     if let Err(e) = send_result {
         tracing::warn!("Send message failed: {e}");
+        return;
     }
 
     let winner_user_result = get_room_and_execute_option(state, &room_id, |room| {

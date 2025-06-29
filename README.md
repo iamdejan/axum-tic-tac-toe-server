@@ -39,7 +39,7 @@ wscat -c wss://localhost:8080/ws --ca "$(mkcert -CAROOT)/rootCA.pem"
 ### Create Room
 
 ```json
-{"command": "create"}
+{"command": "create", "params": {"user_id": "01JYGRSRD8Y20N08HMD2K9A1G1"}}
 ```
 
 ### Join Room

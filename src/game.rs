@@ -111,6 +111,10 @@ impl Room {
         return None;
     }
 
+    pub fn get_current_turn(&self) -> Option<char> {
+        return self.current_turn;
+    }
+
     pub fn register_move(
         &mut self,
         row: usize,
@@ -123,6 +127,11 @@ impl Room {
         }
 
         let _ = square.insert(character);
+        if character == 'x' {
+            self.current_turn = Some('o');
+        } else {
+            self.current_turn = Some('x');
+        }
         return Ok(self.board.clone());
     }
 
