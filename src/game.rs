@@ -84,6 +84,10 @@ impl Room {
         return self.x.is_some() && self.o.is_some();
     }
 
+    pub fn is_empty(&self) -> bool {
+        return self.x.is_none() && self.o.is_none();
+    }
+
     pub fn start_game(&mut self) {
         self.current_turn = Option::Some('x');
     }

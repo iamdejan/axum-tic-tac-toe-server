@@ -237,6 +237,12 @@ fn leave_room(state: &AppState, params: HashMap<String, String>) {
     if let Err(e) = send_result {
         tracing::warn!("Send message failed: {e}");
     }
+
+    let is_room_empty = get_room_and_execute_result(state, &room_id, |room| Ok(room.is_empty())).unwrap();
+    if is_room_empty {
+        let mut rooms = state.rooms.lock().unwrap();
+        rooms.remove(&room_id);
+    }
 }
 
 fn register_move(state: &AppState, params: HashMap<String, String>) {
