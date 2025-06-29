@@ -128,6 +128,7 @@ fn create_room(state: &AppState, params: HashMap<String, String>) {
     let message = json!({
         "room_id": room_id,
         "user_id": &user_id,
+        "event": "ROOM_CREATED"
     });
     let send_result = state.sender.send(message.to_string());
     if let Err(e) = send_result {
