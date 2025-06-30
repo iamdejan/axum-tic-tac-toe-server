@@ -242,6 +242,24 @@ impl Room {
     pub fn has_game_finished(&self) -> bool {
         return self.winner.is_some();
     }
+
+    pub fn is_game_draw(&self) -> bool {
+        if self.winner.is_some() {
+            return false;
+        }
+
+        let mut empty_cells = 9;
+        for row in 0..=2 {
+            for column in 0..=2 {
+                let cell = self.board[row][column];
+                if cell.is_some() {
+                    empty_cells -= 1;
+                }
+            }
+        }
+
+        return empty_cells == 0;
+    }
 }
 
 #[derive(Clone)]
