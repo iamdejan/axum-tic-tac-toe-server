@@ -385,7 +385,8 @@ fn register_move(state: &AppState, params: HashMap<String, String>) {
         return;
     }
 
-    let is_draw_option = get_room_and_execute_option(state, &room_id, |room| Some(room.is_game_draw()));
+    let is_draw_option =
+        get_room_and_execute_option(state, &room_id, |room| Some(room.is_game_draw()));
     if let Some(is_draw) = is_draw_option {
         if is_draw {
             let message = json!({
