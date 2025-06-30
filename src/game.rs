@@ -5,12 +5,20 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum GameCharacter {
+    #[serde(alias = "X")]
+    X,
+    #[serde(alias = "O")]
+    O,
+}
+
 pub struct Room {
     x: Option<String>,
     o: Option<String>,
-    board: [[Option<char>; 3]; 3],
-    current_turn: Option<char>,
-    winner: Option<char>,
+    board: [[Option<GameCharacter>; 3]; 3],
+    current_turn: Option<GameCharacter>,
+    winner: Option<GameCharacter>,
 }
 
 impl Room {
@@ -24,15 +32,15 @@ impl Room {
         };
     }
 
-    pub fn join(&mut self, user_id: String) -> Result<char, String> {
+    pub fn join(&mut self, user_id: String) -> Result<GameCharacter, String> {
         match self.x.clone() {
             None => {
                 self.x = Some(user_id);
-                return Ok('x');
+                return Ok(GameCharacter::X);
             }
             Some(assigned_user_id) => {
                 if assigned_user_id == user_id {
-                    return Ok('x');
+                    return Ok(GameCharacter::X);
                 }
             }
         }
@@ -40,11 +48,11 @@ impl Room {
         match self.o.clone() {
             None => {
                 self.o = Some(user_id);
-                return Ok('o');
+                return Ok(GameCharacter::O);
             }
             Some(assigned_user_id) => {
                 if assigned_user_id == user_id {
-                    return Ok('o');
+                    return Ok(GameCharacter::O);
                 }
             }
         }
@@ -52,14 +60,14 @@ impl Room {
         return Err(String::from("Room is already full"));
     }
 
-    pub fn leave(&mut self, user_id: String) -> Result<char, String> {
+    pub fn leave(&mut self, user_id: String) -> Result<GameCharacter, String> {
         let e = Err(String::from("User never joined this room"));
 
         match self.x.clone() {
             Some(assigned_user_id) => {
                 if assigned_user_id == user_id {
                     self.x = None;
-                    return Ok('x');
+                    return Ok(GameCharacter::X);
                 }
             }
             _ => {}
@@ -69,7 +77,7 @@ impl Room {
             Some(assigned_user_id) => {
                 if assigned_user_id == user_id {
                     self.o = None;
-                    return Ok('o');
+                    return Ok(GameCharacter::O);
                 } else {
                     return e;
                 }
@@ -89,7 +97,7 @@ impl Room {
     }
 
     pub fn start_game(&mut self) {
-        self.current_turn = Option::Some('x');
+        self.current_turn = Option::Some(GameCharacter::X);
     }
 
     pub fn has_game_started(&self) -> bool {
@@ -97,25 +105,25 @@ impl Room {
     }
 
     /// get_character is a function that returns the character of the user.
-    pub fn get_character(&self, user_id: &String) -> Option<char> {
+    pub fn get_character(&self, user_id: &String) -> Option<GameCharacter> {
         let x = self.x.as_ref();
         if let Some(value) = x {
             if value == user_id {
-                return Some('x');
+                return Some(GameCharacter::X);
             }
         }
 
         let o = self.o.as_ref();
         if let Some(value) = o {
             if value == user_id {
-                return Some('o');
+                return Some(GameCharacter::O);
             }
         }
 
         return None;
     }
 
-    pub fn get_current_turn(&self) -> Option<char> {
+    pub fn get_current_turn(&self) -> Option<GameCharacter> {
         return self.current_turn;
     }
 
@@ -123,23 +131,23 @@ impl Room {
         &mut self,
         row: usize,
         column: usize,
-        character: char,
-    ) -> Result<[[Option<char>; 3]; 3], String> {
+        character: GameCharacter,
+    ) -> Result<[[Option<GameCharacter>; 3]; 3], String> {
         let square = self.board.get_mut(row).unwrap().get_mut(column).unwrap();
         if square.is_some() {
             return Err(String::from("invalid move"));
         }
 
         let _ = square.insert(character);
-        if character == 'x' {
-            self.current_turn = Some('o');
+        if character == GameCharacter::X {
+            self.current_turn = Some(GameCharacter::O);
         } else {
-            self.current_turn = Some('x');
+            self.current_turn = Some(GameCharacter::X);
         }
         return Ok(self.board.clone());
     }
 
-    fn check_winner(&self) -> Option<char> {
+    fn check_winner(&self) -> Option<GameCharacter> {
         // left -> right
         for r in 0..=2 {
             let mut same_char = true;
@@ -212,23 +220,22 @@ impl Room {
         return None;
     }
 
-    pub fn check_and_set_winner(&mut self) -> Option<char> {
+    pub fn check_and_set_winner(&mut self) -> Option<GameCharacter> {
         let winner = self.check_winner();
         self.winner = winner;
         return winner;
     }
 
-    pub fn get_user_id_from_character(&self, character: char) -> Option<(char, String)> {
+    pub fn get_user_id_from_character(&self, character: GameCharacter) -> Option<(char, String)> {
         return match character {
-            'x' => match self.x.clone() {
+            GameCharacter::X => match self.x.clone() {
                 Some(user_id) => Some(('x', user_id)),
                 _ => None,
             },
-            'o' => match self.o.clone() {
+            GameCharacter::O => match self.o.clone() {
                 Some(user_id) => Some(('o', user_id)),
                 _ => None,
             },
-            _ => None,
         };
     }
 
