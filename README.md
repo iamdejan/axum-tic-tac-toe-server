@@ -2,9 +2,7 @@
 
 This is a server for tic-tac-toe games, made by Axum and powered by WebSockets.
 
-## Local Setup
-
-### Prerequisites
+## Prerequisites
 
 Here's what you need to setup for the first time:
 1. Install Rust language compiler and its toolkits (e.g. `cargo`). You can use Rustup (e.g. in Homebrew: `brew install rustup`) for that.
@@ -13,7 +11,7 @@ Here's what you need to setup for the first time:
 4. Run `make cert/generate`.
 5. Install `wscat` with this command: `npm install --global wscat`. This would be useful to test WebSocket connection without Postman or Insomnia.
 
-### Run the server
+## Run the server
 
 Run `cargo run`. Expect longer times for the first run, because it's downloading and building all dependencies.
 
