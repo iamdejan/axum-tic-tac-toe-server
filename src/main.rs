@@ -141,6 +141,20 @@ fn join_room(state: &AppState, params: HashMap<String, String>) {
     let room_id = params.get("room_id").unwrap().to_string();
     let user_id = params.get("user_id").unwrap().to_string();
 
+    {
+        let rooms = state.rooms.lock().unwrap();
+        let room_exists = rooms.contains_key(&room_id);
+        if !room_exists {
+            let message = json!({
+                "room_id": &room_id,
+                "error": "Room does not exist!",
+                "user_id": &user_id
+            });
+            state.sender.send(message.to_string()).unwrap();
+            return;
+        }
+    }
+
     let is_game_started = has_game_started(state, &room_id);
     if is_game_started {
         let message = json!({
@@ -202,6 +216,20 @@ fn leave_room(state: &AppState, params: HashMap<String, String>) {
     let room_id = params.get("room_id").unwrap().to_string();
     let user_id = params.get("user_id").unwrap().to_string();
 
+    {
+        let rooms = state.rooms.lock().unwrap();
+        let room_exists = rooms.contains_key(&room_id);
+        if !room_exists {
+            let message = json!({
+                "room_id": &room_id,
+                "error": "Room does not exist!",
+                "user_id": &user_id
+            });
+            state.sender.send(message.to_string()).unwrap();
+            return;
+        }
+    }
+
     let is_game_started = has_game_started(state, &room_id);
     if is_game_started {
         let message = json!({
@@ -238,7 +266,8 @@ fn leave_room(state: &AppState, params: HashMap<String, String>) {
         tracing::warn!("Send message failed: {e}");
     }
 
-    let is_room_empty = get_room_and_execute_result(state, &room_id, |room| Ok(room.is_empty())).unwrap();
+    let is_room_empty =
+        get_room_and_execute_result(state, &room_id, |room| Ok(room.is_empty())).unwrap();
     if is_room_empty {
         let mut rooms = state.rooms.lock().unwrap();
         rooms.remove(&room_id);
@@ -248,6 +277,20 @@ fn leave_room(state: &AppState, params: HashMap<String, String>) {
 fn register_move(state: &AppState, params: HashMap<String, String>) {
     let room_id = params.get("room_id").unwrap().to_string();
     let user_id = params.get("user_id").unwrap().to_string();
+
+    {
+        let rooms = state.rooms.lock().unwrap();
+        let room_exists = rooms.contains_key(&room_id);
+        if !room_exists {
+            let message = json!({
+                "room_id": &room_id,
+                "error": "Room does not exist!",
+                "user_id": &user_id
+            });
+            state.sender.send(message.to_string()).unwrap();
+            return;
+        }
+    }
 
     let has_game_finished = has_game_finished(state, &room_id);
     if has_game_finished {
