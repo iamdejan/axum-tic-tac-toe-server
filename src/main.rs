@@ -366,14 +366,14 @@ fn register_move(state: &AppState, params: HashMap<String, String>) {
         return;
     }
 
-    let winner_user_result = get_room_and_execute_option(state, &room_id, |room| {
+    let winner_user_option = get_room_and_execute_option(state, &room_id, |room| {
         let w = room.check_and_set_winner();
         match w {
             Some(character) => room.get_user_id_from_character(character),
             _ => None,
         }
     });
-    if let Some(winner_user) = winner_user_result {
+    if let Some(winner_user) = winner_user_option {
         let message = json!({
             "room_id": &room_id,
             "user_id": &user_id,
@@ -382,6 +382,18 @@ fn register_move(state: &AppState, params: HashMap<String, String>) {
             "winner_character": winner_user.0,
         });
         state.sender.send(message.to_string()).unwrap();
+        return;
+    }
+
+    let is_draw_option = get_room_and_execute_option(state, &room_id, |room| Some(room.is_game_draw()));
+    if let Some(is_draw) = is_draw_option {
+        if is_draw {
+            let message = json!({
+                "room_id": &room_id,
+                "event": "GAME_DRAWN",
+            });
+            state.sender.send(message.to_string()).unwrap();
+        }
     }
 }
 
